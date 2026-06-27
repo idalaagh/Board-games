@@ -425,7 +425,8 @@ function App() {
       fetchBGGImage(d.bggId).then(function(b64) {
         if (b64) {
           setImgCache(function(prev) {
-            var updated = Object.assign({}, prev, { [name]: b64 });
+            var updated = Object.assign({}, prev);
+            updated[name] = b64;
             saveLS(IMG_KEY, updated);
             return updated;
           });
@@ -727,39 +728,30 @@ function FilterRow(label, options, val, setVal, color) {
 }
 
 // ── BGG Image Fetcher ─────────────────────────────────────────────────────────
+// ── BGG Image: get URL only (img tags bypass CORS) ──────────────────────────
 async function fetchBGGImage(bggId) {
   if (!bggId) return null;
+  var bggApiUrl = 'https://boardgamegeek.com/xmlapi2/thing?id=' + bggId;
   var proxies = [
-    'https://corsproxy.io/?',
-    'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?' + encodeURIComponent(bggApiUrl),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(bggApiUrl),
+    'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(bggApiUrl),
+    bggApiUrl,
   ];
-  var imgUrl = null;
   for (var i = 0; i < proxies.length; i++) {
     try {
-      var res = await fetch(proxies[i] + encodeURIComponent('https://boardgamegeek.com/xmlapi2/thing?id=' + bggId));
+      var res = await fetch(proxies[i], { signal: AbortSignal.timeout(10000) });
       if (!res.ok) continue;
       var text = await res.text();
       var m = text.match(/<thumbnail>([^<]+)<\/thumbnail>/);
       if (m && m[1].trim()) {
-        imgUrl = m[1].trim();
-        if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
-        break;
+        var url = m[1].trim();
+        if (url.startsWith('//')) url = 'https:' + url;
+        return url; // Return URL directly — img tags can load it without CORS
       }
     } catch(e) { continue; }
   }
-  if (!imgUrl) return null;
-  try {
-    var r = await fetch('https://corsproxy.io/?' + encodeURIComponent(imgUrl));
-    if (!r.ok) r = await fetch(imgUrl);
-    if (!r.ok) return null;
-    var blob = await r.blob();
-    return await new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function(){ resolve(reader.result); };
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  } catch(e) { return null; }
+  return null;
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────

@@ -683,11 +683,14 @@ function App() {
         ? h('div', { style:{ textAlign:'center', color:'#7c6e9a', padding:60, fontSize:15 } }, 'لا توجد نتائج')
         : h('div', { style: S.grid },
             filtered.map(function(n) {
+              var _bgg = getDB(n);
+              var _img = (_bgg && _bgg.imgEmbedded) ? _bgg.imgEmbedded : (imgCache[n] || null);
               return h(GameCard, {
-                key: n, name: n,
-                bgg: getDB(n),
+                key: n + (_img ? '1' : '0'),
+                name: n,
+                bgg: _bgg,
                 lend: lendData[n],
-                imgUrl: getImgUrl(n),
+                imgUrl: _img,
                 isCustom: custom.indexOf(n) >= 0,
                 onLend:   function(){ setLending(n); },
                 onDelete: function(){ deleteGame(n); },

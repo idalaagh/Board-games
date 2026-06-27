@@ -35,10 +35,15 @@ const CUSTOM_DB_KEY = 'bgc_customdb_v4';
 const IMG_KEY = 'bgc_imgs_v1';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+// In-memory fallback when localStorage is blocked (sandboxed iframes)
+var _memStore = {};
 function loadLS(key, def) {
-  try { var r = localStorage.getItem(key); return r ? JSON.parse(r) : def; } catch(e) { return def; }
+  if (_memStore[key] !== undefined) return _memStore[key];
+  try { var r = localStorage.getItem(key); var parsed = r ? JSON.parse(r) : def; _memStore[key] = parsed; return parsed; } 
+  catch(e) { return _memStore[key] !== undefined ? _memStore[key] : def; }
 }
 function saveLS(key, val) {
+  _memStore[key] = val;
   try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {}
 }
 
@@ -444,7 +449,7 @@ function App() {
   function flash(msg) { setToast(msg); setTimeout(function(){ setToast(null); }, 3000); }
 
   function saveLend(name, form) {
-    var next = Object.assign({}, lendData, { [name]: form });
+    var next = Object.assign({}, lendData); next[name] = form;
     setLend(next); saveLS(LEND_KEY, next); setLending(null);
     flash('✓ تم حفظ حالة الاستعارة');
   }
@@ -453,7 +458,7 @@ function App() {
     var norm = name.trim();
     var nc = custom.concat([norm]);
     setCustom(nc); saveLS(CUSTOM_KEY, nc);
-    var ndb = Object.assign({}, customDB, { [norm]: data });
+    var ndb = Object.assign({}, customDB); ndb[norm] = data;
     setCustomDB(ndb); saveLS(CUSTOM_DB_KEY, ndb);
     setAdding(false);
     flash('✓ تمت إضافة "' + (data.name || norm) + '"');
@@ -687,7 +692,7 @@ function App() {
               var _bgg = getDB(n);
               var _img = (_bgg && _bgg.imgEmbedded) ? _bgg.imgEmbedded : (imgCache[n] || null);
               return h(GameCard, {
-                key: n + (_img ? '1' : '0'),
+                key: n,
                 name: n,
                 bgg: _bgg,
                 lend: lendData[n],
@@ -740,7 +745,7 @@ async function fetchBGGImage(bggId) {
   ];
   for (var i = 0; i < proxies.length; i++) {
     try {
-      var res = await fetch(proxies[i], { signal: AbortSignal.timeout(10000) });
+      var res = await fetch(proxies[i]);
       if (!res.ok) continue;
       var text = await res.text();
       var m = text.match(/<thumbnail>([^<]+)<\/thumbnail>/);

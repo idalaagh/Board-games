@@ -23,6 +23,7 @@ input,select,button,textarea{font-family:inherit}
 </head>
 <body>
 <div id="root"></div>
+<script src="firebase-config.js"></script>
 <script>
 
 
@@ -253,78 +254,76 @@ function RulesModal(props) {
 
 // ── Add Game Modal ─────────────────────────────────────────────────────────────
 function AddModal(props) {
-  var _q = useState(''); var q = _q[0], setQ = _q[1];
-  var _s = useState('idle'); var status = _s[0], setStatus = _s[1];
-  var _p = useState(null); var preview = _p[0], setPreview = _p[1];
-  var _e = useState(''); var err = _e[0], setErr = _e[1];
-
-  function doSearch() {
-    if (!q.trim()) return;
-    if (props.existing.map(function(n){return n.toLowerCase();}).indexOf(q.trim().toLowerCase()) >= 0) {
-      setErr('هذه اللعبة موجودة بالفعل'); return;
-    }
-    setStatus('loading'); setErr(''); setPreview(null);
-    var prompt = 'Return BGG data for board game "' + q.trim() + '". Reply ONLY raw JSON:\n{"name":"title","year":2020,"minP":2,"maxP":4,"bestP":"3","minT":45,"maxT":90,"weight":2.8,"categories":["Strategy"],"bggRating":7.6,"desc":"One sentence."}\nOnly JSON, no markdown.';
-    fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:600,
-        messages:[{role:'user',content:prompt}] })
-    }).then(function(r){return r.json();}).then(function(d){
-      var txt = (d.content||[]).map(function(b){return b.text||'';}).join('');
-      var m = txt.replace(/```json|```/g,'').trim().match(/\{[\s\S]*\}/);
-      if (!m) throw new Error('no json');
-      var parsed = JSON.parse(m[0]);
-      setPreview(parsed); setStatus('done');
-    }).catch(function(){
-      setStatus('error'); setErr('تعذّر جلب البيانات، تأكد من الاسم');
-    });
+  var _f = useState({name:'',minP:'',maxP:'',minT:'',maxT:'',year:'',weight:'',bestP:'',descAr:'',imgUrl:''});
+  var form = _f[0], setForm = _f[1];
+  var _err = useState(''), err = _err[0], setErr = _err[1];
+  var _busy = useState(false), busy = _busy[0], setBusy = _busy[1];
+  var _imageBusy = useState(false), imageBusy = _imageBusy[0], setImageBusy = _imageBusy[1];
+  function field(key, label, type, extra) {
+    return h('label', {style:S.fGroup}, h('span',{style:S.label}, label),
+      h('input', Object.assign({style:Object.assign({},S.inp,{width:'100%',minWidth:0}), type:type||'text',
+        value:form[key], onChange:function(e){var value=e.target.value;setForm(function(p){return Object.assign({},p,{[key]:value});});setErr('');}
+      },extra||{})));
   }
-
-  return h(Modal, { onClose: props.onClose },
-    h('div', { style: Object.assign({}, S.modal, { maxWidth:480 }) },
-      h('div', { style: S.mHead },
-        h('div', { style:{ display:'flex', alignItems:'center', gap:10 } },
-          h('span', { style:{ color:'#c9a84c', fontSize:22, fontWeight:700 } }, '+'),
-          h('div', { style: S.mTitle }, 'إضافة لعبة جديدة')
-        ),
-        h('button', { style: S.xBtn, onClick: props.onClose }, Ico('close',16))
-      ),
-      h('div', { style: S.mBody },
-        h('div', { style: S.fGroup },
-          h('label', { style: S.label }, 'اسم اللعبة بالإنجليزية'),
-          h('div', { style:{ display:'flex', gap:8 } },
-            h('input', { style: Object.assign({}, S.inp, {flex:1}), value:q,
-              placeholder:'مثال: Wingspan',
-              onChange: function(e){setQ(e.target.value);setErr('');},
-              onKeyDown: function(e){if(e.key==='Enter')doSearch();} }),
-            h('button', { style: S.savBtn, onClick: doSearch, disabled: status==='loading' },
-              status==='loading' ? h(Spinner,{size:16}) : 'بحث'
-            )
-          ),
-          err && h('div', { style:{ fontSize:12, color:'#e74c3c', marginTop:4 } }, err)
-        ),
-        status==='loading' && h('div', { style:{ display:'flex', alignItems:'center', gap:10, padding:'20px 0', justifyContent:'center' } },
-          h(Spinner, { size:24 }),
-          h('span', { style:{ color:'#999999', fontSize:13 } }, 'جارٍ جلب البيانات...')
-        ),
-        preview && h('div', { style: S.prevBox },
-          h('div', { style:{ fontSize:16, fontWeight:700, color:'#e8c96d' } }, preview.name||q),
-          preview.year && h('div', { style:{ fontSize:11, color:'#888888' } }, preview.year),
-          preview.desc && h('div', { style:{ fontSize:13, color:'#AAAAAA', lineHeight:1.5, marginTop:4 } }, preview.desc),
-          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:7, marginTop:8 } },
-            preview.minP && h('div', { style: S.mChip }, h('span',{style:{color:'#999999',fontSize:10}},'اللاعبون'), h('span',{style:{color:'#e8c96d',fontWeight:700}}, preview.minP+'–'+preview.maxP)),
-            preview.weight && h('div', { style: S.mChip }, h('span',{style:{color:'#999999',fontSize:10}},'التعقيد'), h('span',{style:{color:'#e8c96d',fontWeight:700}}, preview.weight+'/5')),
-            preview.bggRating && h('div', { style: S.mChip }, h('span',{style:{color:'#999999',fontSize:10}},'BGG'), h('span',{style:{color:'#e8c96d',fontWeight:700}}, preview.bggRating))
-          )
-        )
-      ),
-      preview && h('div', { style: S.mFoot },
-        h('button', { style: S.canBtn, onClick: props.onClose }, 'إلغاء'),
-        h('button', { style: S.savBtn, onClick: function(){ props.onAdd(q.trim(), preview); } }, 'إضافة ✓')
-      )
-    )
-  );
+  function submit(e) {
+    e.preventDefault(); if(busy || imageBusy) return;
+    var name=form.name.trim();
+    if(!name) {setErr('اكتب اسم اللعبة');return;}
+    if(props.existing.some(function(n){return BoardSync.key(n)===BoardSync.key(name);})) {setErr('هذه اللعبة موجودة بالفعل');return;}
+    if((form.minP && form.maxP && +form.minP>+form.maxP) || (form.minT && form.maxT && +form.minT>+form.maxT)) {
+      setErr('الحد الأعلى يجب أن يكون أكبر من الحد الأدنى أو يساويه');return;
+    }
+    if(form.imgUrl && !/^https:\/\//i.test(form.imgUrl)) {setErr('استخدم رابط صورة يبدأ بـ https://');return;}
+    var data={name:name, categories:[]};
+    ['year','minP','maxP','minT','maxT','weight'].forEach(function(k){if(form[k]!=='')data[k]=+form[k];});
+    if(data.minP && !data.maxP)data.maxP=data.minP;
+    if(data.maxP && !data.minP)data.minP=data.maxP;
+    if(data.minT && !data.maxT)data.maxT=data.minT;
+    if(data.maxT && !data.minT)data.minT=data.maxT;
+    ['bestP','descAr','imgUrl','imgEmbedded'].forEach(function(k){if(form[k])data[k]=form[k].trim();});
+    setBusy(true);
+    Promise.resolve(props.onAdd(name,data)).then(function(ok){if(!ok){setBusy(false);setErr('لم تُحفظ اللعبة. راجع حالة المزامنة وحاول مرة أخرى.');}})
+      .catch(function(){setBusy(false);setErr('تعذّر حفظ اللعبة');});
+  }
+  function pickImage(e) {
+    var file=e.target.files[0]; if(!file)return;
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)||file.size>15*1024*1024) {setErr('اختر صورة JPG أو PNG أو WebP بحجم أقل من ١٥ ميغابايت');return;}
+    setImageBusy(true);setErr('');
+    var url=URL.createObjectURL(file), img=new Image();
+    img.onload=function(){
+      try {
+        var canvas=document.createElement('canvas'), scale=Math.min(1,640/Math.max(img.width,img.height));
+        canvas.width=Math.round(img.width*scale);canvas.height=Math.round(img.height*scale);
+        canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+        var data=canvas.toDataURL('image/jpeg',0.8);
+        setForm(function(p){return Object.assign({},p,{imgEmbedded:data,imgUrl:''});});
+      } catch(error){setErr('تعذّر قراءة الصورة');}
+      finally{URL.revokeObjectURL(url);setImageBusy(false);}
+    };
+    img.onerror=function(){URL.revokeObjectURL(url);setImageBusy(false);setErr('تعذّر قراءة الصورة');};
+    img.src=url;
+  }
+  return h(Modal,{onClose:props.onClose}, h('form',{onSubmit:submit,style:Object.assign({},S.modal,{maxWidth:520})},
+    h('div',{style:S.mHead},h('div',{style:S.mTitle},'إضافة لعبة جديدة'),
+      h('button',{type:'button',style:S.xBtn,'aria-label':'إغلاق',onClick:props.onClose},Ico('close',16))),
+    h('div',{style:S.mBody},
+      h('p',{style:{color:'#aaa',fontSize:13,lineHeight:1.7}},'اسم اللعبة يكفي للإضافة. أضف الصورة والتفاصيل إذا حبيت.'),
+      field('name','اسم اللعبة','text',{required:true,maxLength:160,placeholder:'مثال: Wingspan',autoFocus:true}),
+      h('div',{style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}},
+        field('minP','أقل عدد لاعبين','number',{min:1,max:100,step:1}),field('maxP','أكثر عدد لاعبين','number',{min:1,max:100,step:1}),
+        field('minT','أقصر مدة (دقيقة)','number',{min:1,max:10000,step:1}),field('maxT','أطول مدة (دقيقة)','number',{min:1,max:10000,step:1}),
+        field('weight','التعقيد (١–٥)','number',{min:1,max:5,step:0.01}),field('year','سنة الإصدار','number',{min:1800,max:2100,step:1})),
+      field('descAr','وصف مختصر','text',{maxLength:700}),
+      h('label',{style:S.fGroup},h('span',{style:S.label},'صورة الغلاف'),h('input',{type:'file',accept:'image/jpeg,image/png,image/webp',onChange:pickImage,disabled:busy||imageBusy,style:{maxWidth:'100%'}})),
+      imageBusy && h('span',null,'جارٍ تجهيز الصورة…'),
+      form.imgEmbedded && h('div',null,h('img',{src:form.imgEmbedded,alt:'معاينة الغلاف',style:{maxWidth:140,maxHeight:140,borderRadius:8}}),
+        h('button',{type:'button',style:S.canBtn,onClick:function(){setForm(function(p){return Object.assign({},p,{imgEmbedded:''});});}},'إزالة الصورة')),
+      !form.imgEmbedded && field('imgUrl','أو رابط صورة','url',{placeholder:'https://…',maxLength:2000}),
+      err && h('p',{role:'alert',style:{color:'#ff9393',fontSize:13}},err)),
+    h('div',{style:S.mFoot},h('button',{type:'button',style:S.canBtn,onClick:props.onClose},'إلغاء'),
+      h('button',{type:'submit',style:S.savBtn,disabled:busy||imageBusy},busy?'جارٍ الحفظ…':'إضافة اللعبة ✓'))));
 }
+
 
 // ── Game Card ─────────────────────────────────────────────────────────────────
 
@@ -341,8 +340,8 @@ var FavIcon=function(props){
   var emoji=(!fa&&!fah)?'🌑':(!fa&&fah)?'☀️':(fa&&!fah)?'🌙':'🪢';
   var title=(!fa&&!fah)?'أضف للمفضلة':(!fa&&fah)?'أحمد':(fa&&!fah)?'آلاء':'كلانا';
   return h('button',{
-    onClick:handleClick,
-    title:title,
+    onClick:handleClick, disabled:props.readOnly,
+    title:title, 'aria-label':'المفضلة: '+title,
     style:{position:'absolute',top:7,right:7,background:'rgba(0,0,0,0.45)',
       border:'none',borderRadius:'50%',width:28,height:28,fontSize:14,
       cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',
@@ -394,15 +393,17 @@ function GameCard(props) {
 
   return h('div', { style: Object.assign({}, S.card, borrowed ? S.cardB : {}) },
     borrowed && h('div', { style: S.bStripe }),
+    !imgUrl && h('div', {style:{position:'relative',minHeight:36}},
+      h(FavIcon, {favsAlaa:favsAlaa,favsAhmed:favsAhmed,readOnly:!props.canEdit,onToggleAlaa:props.onToggleFavAlaa,onToggleAhmed:props.onToggleFavAhmed})),
 
     imgUrl && h('div', { style:{ margin:'-14px -15px 10px', borderRadius:'13px 13px 0 0', overflow:'hidden', flexShrink:0, position:'relative' } },
       h('img', { src: imgUrl, alt: props.name,
         style:{ width:'100%', height:'auto', display:'block' },
-        onError: function(e){ e.target.parentNode.style.display='none'; } }),
+        onError: function(e){ e.target.style.display='none'; e.target.parentNode.style.minHeight='42px'; } }),
       diff && h('span', { style: Object.assign({}, S.diffPill, { background: diff.color,
         position:'absolute', top:8, left:8, boxShadow:'0 2px 8px #00000077' }) }, diff.ar),
       h(FavIcon, { favsAlaa:favsAlaa, favsAhmed:favsAhmed,
-        onToggleAlaa:props.onToggleFavAlaa, onToggleAhmed:props.onToggleFavAhmed })
+        readOnly:!props.canEdit,onToggleAlaa:props.onToggleFavAlaa, onToggleAhmed:props.onToggleFavAhmed })
     ),
 
     h('div', { style:{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:8 } },
@@ -440,16 +441,16 @@ function GameCard(props) {
           onClick: function(e){ e.stopPropagation(); props.onRules(); },
           title: 'قوانين اللعبة'
         }, Ico('book',13)),
-        props.isCustom && h('button', {
+        props.isCustom && props.canEdit && h('button', {
           style: Object.assign({}, S.iconBtn, { borderColor:'#e74c3c33', color:'#e74c3c88' }),
           onClick: function(e){ e.stopPropagation(); props.onDelete(); },
           title: 'حذف'
         }, Ico('trash',13)),
         h('button', {style:Object.assign({},S.lendBtn,borrowed?S.lendBtnOn:{},editingLend?{borderColor:'#c9a84c',color:'#c9a84c'}:{}),
-          onClick:function(e){e.stopPropagation();props.onLend();}
+          disabled:!props.canEdit,title:props.canEdit?undefined:"المشاهدة فقط",onClick:function(e){e.stopPropagation();props.onLend();}
         },Ico('lend',13),borrowed?' مستعارة':(editingLend?' إلغاء':' إعارة')),
         h('button',{style:Object.assign({},S.playedBtn,played?S.playedBtnOn:{}),
-          onClick:function(e){e.stopPropagation();props.onTogglePlayed();}
+          disabled:!props.canEdit,title:props.canEdit?undefined:"المشاهدة فقط",onClick:function(e){e.stopPropagation();props.onTogglePlayed();}
         },played?'✓ لعبناها':'○ ما لعبناها')
       )
     ),
@@ -463,6 +464,28 @@ function GameCard(props) {
 }
 
 // ── Main App ──────────────────────────────────────────────────────────────────
+function SyncPanel(props) {
+  var s=props.status;
+  return h('div',{role:'status',style:{maxWidth:1260,margin:'12px auto 0',padding:'10px 20px',display:'flex',alignItems:'center',gap:10,flexWrap:'wrap',fontSize:12,color:s.error?'#ff9393':'#aaa'}},
+    h('span',{style:{color:s.mode==='synced'?'#75cb98':'#e8c96d'}},s.label),
+    s.error && h('span',null,s.error),
+    s.canLogin && h('button',{style:S.canBtn,onClick:props.onLogin},'دخول آلاء وأحمد'),
+    s.user && h('button',{style:S.canBtn,onClick:props.onLogout},'تسجيل الخروج'),
+    s.canImport && h('button',{style:S.canBtn,onClick:props.onImport,disabled:s.pending>0},'إضافة بيانات الجهاز القديمة'));
+}
+function LoginModal(props) {
+  var _busy=useState(false),busy=_busy[0],setBusy=_busy[1];
+  var _err=useState(''),err=_err[0],setErr=_err[1];
+  function login(e){e.preventDefault();if(busy)return;setBusy(true);setErr('');
+    BoardSync.login().then(function(){props.onClose();})
+      .catch(function(error){setBusy(false);setErr(error.code==='auth/popup-blocked'?'اسمح بفتح نافذة تسجيل الدخول ثم حاول مجددًا.':'لم يكتمل تسجيل الدخول. حاول مجددًا باستخدام حساب Google.');});}
+  return h(Modal,{onClose:props.onClose},h('form',{style:S.modal,onSubmit:login},
+    h('div',{style:S.mHead},h('div',{style:S.mTitle},'دخول العائلة'),h('button',{type:'button',style:S.xBtn,'aria-label':'إغلاق',onClick:props.onClose},Ico('close',16))),
+    h('div',{style:S.mBody},h('p',{style:{fontSize:13,color:'#aaa',lineHeight:1.8}},'المشاهدة متاحة للجميع. لتعديل المجموعة، استخدم حساب Google الخاص بآلاء أو أحمد.'),
+      err && h('p',{role:'alert',style:{color:'#ff9393',fontSize:13}},err)),
+    h('div',{style:S.mFoot},h('button',{type:'button',style:S.canBtn,onClick:props.onClose},'إلغاء'),h('button',{type:'submit',style:S.savBtn,disabled:busy},busy?'جارٍ الدخول…':'الدخول باستخدام Google'))));
+}
+
 function App() {
   var _lend=useState(function(){return loadLS(LEND_KEY,{});});
   var lendData=_lend[0];var setLend=_lend[1];
@@ -494,6 +517,14 @@ function App() {
   var _toast   = useState(null); var toast = _toast[0]; var setToast = _toast[1];
   var _imgProg = useState(null); var imgProgress = _imgProg[0]; var setImgProgress = _imgProg[1];
 
+  var _sync = useState(BoardSync.status()); var sync = _sync[0], setSync = _sync[1];
+  var _login = useState(false); var showLogin = _login[0], setShowLogin = _login[1];
+  useEffect(function() {
+    return BoardSync.subscribe(function(state, status) {
+      setLend(state.lend); setPlayed(state.played); setFavs(state.favs);
+      setCustom(state.custom); setCustomDB(state.customDB); setSync(status);
+    });
+  }, []);
   var allNames = useMemo(function(){ return GAME_NAMES.concat(custom); }, [custom]);
   function getDB(name) { return BGG_DB[name] || customDB[name] || null; }
 
@@ -535,33 +566,31 @@ function App() {
 
   function flash(msg) { setToast(msg); setTimeout(function(){ setToast(null); }, 3000); }
 
+  function perform(action, message, onDone) {
+    return action.then(function(){ if(onDone) onDone(); if(message) flash(message); return true; })
+      .catch(function(e){ flash(e.message || 'تعذّر حفظ التغيير'); return false; });
+  }
   function saveLend(name, form) {
-    var next = Object.assign({}, lendData); next[name] = form;
-    setLend(next); saveLS(LEND_KEY, next); setLending(null);
-    flash('✓ تم حفظ حالة الاستعارة');
+    return perform(BoardSync.write(name, 'lend', form), '✓ تم حفظ حالة الاستعارة', function(){setLending(null);});
   }
-
-  function togglePlayed(name){var n2=Object.assign({},playedData);if(n2[name]){delete n2[name];}else{n2[name]=true;}setPlayed(n2);saveLS(PLAYED_KEY,n2);}
-  function toggleFav(name,person){var n2=Object.assign({},favsData);if(!n2[name])n2[name]={};var e2=Object.assign({},n2[name]);if(e2[person]){delete e2[person];}else{e2[person]=true;}if(Object.keys(e2).length===0){delete n2[name];}else{n2[name]=e2;}setFavs(n2);saveLS(FAVS_KEY,n2);}
-  function saveLendInline(name,form){var n2=Object.assign({},lendData);n2[name]=form;setLend(n2);saveLS(LEND_KEY,n2);setEditingLend(null);}
+  function togglePlayed(name) {
+    return perform(BoardSync.write(name, 'played', !playedData[name]));
+  }
+  function toggleFav(name, person) {
+    return perform(BoardSync.write(name, 'favs/' + person, !(favsData[name] && favsData[name][person])));
+  }
+  function saveLendInline(name, form) {
+    return perform(BoardSync.write(name, 'lend', form), '✓ تم حفظ حالة الاستعارة', function(){setEditingLend(null);});
+  }
   function addGame(name, data) {
-    var norm = name.trim();
-    var nc = custom.concat([norm]);
-    setCustom(nc); saveLS(CUSTOM_KEY, nc);
-    var ndb = Object.assign({}, customDB); ndb[norm] = data;
-    setCustomDB(ndb); saveLS(CUSTOM_DB_KEY, ndb);
-    setAdding(false);
-    flash('✓ تمت إضافة "' + (data.name || norm) + '"');
+    if(allNames.some(function(n){return BoardSync.key(n) === BoardSync.key(name);})) {
+      flash('هذه اللعبة موجودة بالفعل'); return Promise.resolve(false);
+    }
+    return perform(BoardSync.add(name, data), '✓ تمت إضافة اللعبة', function(){setAdding(false);});
   }
-
   function deleteGame(name) {
     if (!confirm('هل تريد حذف "' + name + '"؟')) return;
-    var nc = custom.filter(function(n){ return n !== name; });
-    setCustom(nc); saveLS(CUSTOM_KEY, nc);
-    var ndb = Object.assign({}, customDB);
-    delete ndb[name];
-    setCustomDB(ndb); saveLS(CUSTOM_DB_KEY, ndb);
-    flash('✓ تم الحذف');
+    return perform(BoardSync.remove(name), '✓ تم الحذف');
   }
 
   var allCats = useMemo(function() {
@@ -685,18 +714,24 @@ function App() {
       )
     ),
 
+    h(SyncPanel, {status:sync, onLogin:function(){setShowLogin(true);},
+      onImport:function(){ if(confirm('إضافة بيانات هذا الجهاز القديمة للمجموعة؟ البيانات الموجودة في المجموعة لها الأولوية.'))
+        perform(BoardSync.importLegacy(), '✓ تمت إضافة البيانات القديمة'); },
+      onLogout:function(){perform(BoardSync.logout());}}),
+    showLogin && h(LoginModal, {onClose:function(){setShowLogin(false);}}),
+
     // Toolbar
     h('div', { style: S.toolbar },
       h('div', { style:{ flex:1, position:'relative' } },
         h('span', { style:{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
           color:'#888888', pointerEvents:'none' } }, Ico('search',15)),
-        h('input', { style: S.searchInp, placeholder:'ابحث عن لعبة…', value: search,
+        h('input', { style: S.searchInp, 'aria-label':'ابحث عن لعبة', placeholder:'ابحث عن لعبة…', value: search,
           onChange: function(e){ setSearch(e.target.value); } }),
         search && h('button', { style: S.searchClear, onClick: function(){ setSearch(''); } }, Ico('close',14))
       ),
       h('button', {
         style: Object.assign({}, S.toolBtn, showF ? { borderColor:'#c9a84c', color:'#c9a84c' } : {}, { position:'relative' }),
-        onClick: function(){ setShowF(!showF); }
+        'aria-label':'تصفية الألعاب', title:'تصفية الألعاب', onClick: function(){ setShowF(!showF); }
       },
         Ico('filter',14),
         activeFilters > 0 && h('span', { style:{ position:'absolute', top:-6, left:-6,
@@ -707,7 +742,7 @@ function App() {
       h('button', {
         style: Object.assign({}, S.toolBtn, { background:'linear-gradient(135deg,#c9a84c,#e8c96d)',
           color:'#1A1A1A', border:'none', fontWeight:700 }),
-        onClick: function(){ setAdding(true); }
+        'aria-label':'إضافة لعبة جديدة', title:sync.canEdit?'إضافة لعبة جديدة':'سجّل الدخول للتعديل', onClick: function(){ if(sync.canEdit)setAdding(true);else setShowLogin(true); }
       }, Ico('plus',18))
     ),
 
@@ -781,7 +816,7 @@ function App() {
         : h('div', { style: S.grid },
             filtered.map(function(n) {
               var _bgg = getDB(n);
-              var _img = (_bgg && _bgg.imgEmbedded) ? _bgg.imgEmbedded : (imgCache[n] || null);
+              var _img = getImgUrl(n);
               return h(GameCard, {
                 key: n,
                 name: n,
@@ -789,6 +824,7 @@ function App() {
                 lend: lendData[n],
                 imgUrl: _img,
                 isCustom: custom.indexOf(n) >= 0,
+                canEdit:sync.canEdit,
                 played: !!playedData[n],
                 favsAlaa: !!(favsData[n]&&favsData[n]['alaa']),
                 favsAhmed: !!(favsData[n]&&favsData[n]['ahmed']),
@@ -875,7 +911,7 @@ var S = {
     background:'none', border:'none', color:'#888888', cursor:'pointer', display:'flex', padding:2 },
   toolBtn:  { background:'#1A1A1A', border:'1px solid #2E2E2E', borderRadius:10, padding:'10px 12px',
     color:'#888888', cursor:'pointer', display:'flex', alignItems:'center' },
-  grid:     { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:12 },
+  grid:     { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(min(260px,100%),1fr))', gap:12 },
   card:     { background:'#1E1E1E', border:'1px solid #2A2A2A', borderRadius:13,
     padding:'14px 15px', display:'flex', flexDirection:'column', gap:7,
     position:'relative', overflow:'hidden' },
@@ -922,12 +958,181 @@ var S = {
   mChip:    { background:'#1A1A1A', border:'1px solid #2E2E2E', borderRadius:7, padding:'5px 9px', display:'flex', flexDirection:'column', gap:2, alignItems:'center', minWidth:70 },
   toast:    { position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
     background:'#27ae60', color:'#fff', padding:'10px 22px', borderRadius:10,
-    fontSize:14, fontWeight:600, boxShadow:'0 4px 24px #00000066', zIndex:300, whiteSpace:'nowrap' },
+    fontSize:14, fontWeight:600, boxShadow:'0 4px 24px #00000066', zIndex:300, maxWidth:'calc(100vw - 32px)', textAlign:'center' },
   ruleP:    { margin:0, fontSize:13, color:'#AAAAAA', lineHeight:1.7 },
   ruleStep: { fontSize:13, color:'#AAAAAA', background:'#252525', border:'1px solid #2E2E2E', borderRadius:8, padding:'8px 12px', lineHeight:1.6 },
   langBtn:  { background:'none', border:'none', borderRadius:6, padding:'5px 12px', color:'#888888', cursor:'pointer', fontSize:12 },
   langBtnOn:{ background:'#c9a84c', color:'#181818', fontWeight:700 },
 };
+
+// Small synchronization layer: field-level writes, explicit legacy import, no public credentials.
+var BoardSync = (function() {
+  var config=window.BOARD_FIREBASE, subscribers=[], records={}, ref=null, auth=null;
+  var ready=false, online=false, pending=0, user=null, editor=false, error='', mode=config?'loading':'local';
+  var localKey='bgc_records_v2', cloudKey='', detachValue=null, detachConnection=null, generation=0;
+  var legacy=null, importedKey='', importing=false;
+  function key(name) {
+    return btoa(unescape(encodeURIComponent(name.trim().normalize('NFC').toLowerCase())))
+      .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function read(keyName, fallback) {
+    try {var raw=localStorage.getItem(keyName);return raw?JSON.parse(raw):fallback;}catch(e){return fallback;}
+  }
+  function store(keyName,value) {
+    try {localStorage.setItem(keyName,JSON.stringify(value));}
+    catch(e){throw new Error('مساحة الحفظ في هذا الجهاز غير متاحة. جرّب صورة أصغر أو فعّل التخزين في المتصفح.');}
+  }
+  function oldRecords() {
+    var result={}, lend=read(LEND_KEY,{}), played=read(PLAYED_KEY,{}), favs=read(FAVS_KEY,{});
+    var custom=read(CUSTOM_KEY,[]), db=read(CUSTOM_DB_KEY,{});
+    var names=new Set(Object.keys(lend).concat(Object.keys(played),Object.keys(favs),custom));
+    names.forEach(function(name){
+      var row={name:name};
+      if(lend[name])row.lend=lend[name];
+      if(Object.prototype.hasOwnProperty.call(played,name))row.played=!!played[name];
+      if(favs[name])row.favs=favs[name];
+      if(custom.indexOf(name)>=0)row.data=db[name]||{name:name};
+      result[key(name)]=row;
+    });
+    return result;
+  }
+  function state() {
+    var result={lend:Object.create(null),played:Object.create(null),favs:Object.create(null),custom:[],customDB:Object.create(null)};
+    var builtins=new Map(GAME_NAMES.map(function(n){return [key(n),n];}));
+    Object.keys(records).sort().forEach(function(id){
+      var row=records[id];if(!row||typeof row.name!=='string'||row.deleted)return;
+      var name=builtins.get(id)||row.name;
+      if(row.lend)result.lend[name]=row.lend;
+      if(row.played)result.played[name]=true;
+      if(row.favs)result.favs[name]=row.favs;
+      if(row.data && !builtins.has(id)){result.custom.push(name);result.customDB[name]=row.data;}
+    });
+    return result;
+  }
+  function status() {
+    var label={local:'محفوظ على هذا الجهاز فقط · المزامنة لم تُربط بعد',loading:'جارٍ الاتصال بالمجموعة…',
+      login:'سجّل الدخول لمزامنة مجموعة العائلة',offline:'الاتصال مقطوع · التعديل متوقف مؤقتًا',
+      synced:editor?'● متصل · التغييرات تظهر عند الجميع':'● مشاهدة فقط · التحديثات مباشرة',error:'تعذّر الاتصال بالمجموعة'}[mode];
+    if(pending)label=online?'جارٍ حفظ التغييرات…':'تغييرات بانتظار الاتصال · أبقِ الصفحة مفتوحة';
+    return {mode:mode,label:label,error:error,user:user?user.email||user.uid:null,pending:pending,
+      canLogin:!!(config&&auth&&!user),canEdit:!config||editor,
+      canImport:!!(editor&&ready&&online&&legacy&&Object.keys(legacy).length&&!read(importedKey,false)&&!importing)};
+  }
+  function emit(){var view=state(),s=status();subscribers.forEach(function(fn){fn(view,s);});}
+  function subscribe(fn){subscribers.push(fn);fn(state(),status());return function(){subscribers=subscribers.filter(function(f){return f!==fn;});};}
+  function humanError(e){
+    if(/permission|denied/i.test(e.code||e.message||''))return 'الحساب غير مسموح له بالوصول. يلزم ضبط صلاحيات المجموعة.';
+    return 'تعذّر الاتصال. تحقق من الإنترنت وإعدادات Firebase.';
+  }
+  function loadScript(src){return new Promise(function(resolve,reject){var s=document.createElement('script');s.src=src;s.onload=resolve;s.onerror=reject;document.head.appendChild(s);});}
+  function stopListeners(){if(detachValue)detachValue();if(detachConnection)detachConnection();detachValue=detachConnection=null;}
+  async function start() {
+    legacy=read(localKey,null)||oldRecords();
+    if(!config){records=legacy;ready=true;emit();return;}
+    records={};emit();
+    try {
+      if(!config.firebaseConfig||!config.firebaseConfig.databaseURL||!config.firebaseConfig.apiKey)throw new Error('Missing configuration');
+      var collection=config.collection||'home';
+      if(!/^[a-zA-Z0-9_-]{1,64}$/.test(collection))throw new Error('Invalid collection');
+      var sdk='https://www.gstatic.com/firebasejs/12.4.0/';
+      if(!window.firebase){await loadScript(sdk+'firebase-app-compat.js');await loadScript(sdk+'firebase-auth-compat.js');await loadScript(sdk+'firebase-database-compat.js');}
+      var app=firebase.initializeApp(config.firebaseConfig,'board-game-family');
+      auth=app.auth();
+      var db=app.database();ref=db.ref('collections/'+collection+'/games');
+      importedKey='bgc_imported:'+config.firebaseConfig.databaseURL+':'+collection;
+      auth.onAuthStateChanged(function(current){
+        generation++;var currentGeneration=generation;
+        stopListeners();user=current;editor=false;ready=false;online=false;error='';records={};
+        mode='loading';emit();
+        cloudKey='bgc_cloud:'+config.firebaseConfig.databaseURL+':'+collection+':'+(current?current.uid:'viewer');
+        if(current)db.ref('collections/'+collection+'/editorAccess').once('value').then(function(){
+          if(currentGeneration!==generation)return;editor=true;emit();
+        }).catch(function(){if(currentGeneration!==generation)return;editor=false;emit();});
+        var connected=db.ref('.info/connected');
+        var connectionCallback=function(snapshot){
+          if(currentGeneration!==generation)return;
+          online=snapshot.val()===true;
+          if(mode!=='error')mode=online?(ready?'synced':'loading'):'offline';emit();
+        };
+        connected.on('value',connectionCallback);
+        detachConnection=function(){connected.off('value',connectionCallback);};
+        var callback=function(snapshot){
+          if(currentGeneration!==generation)return;
+          records=snapshot.val()||{};ready=true;error='';mode=online?'synced':'offline';
+          try{store(cloudKey,records);}catch(e){error='المزامنة تعمل، لكن نسخة الجهاز لم تُحفظ: مساحة التخزين ممتلئة.';}
+          emit();
+        };
+        ref.on('value',callback,function(e){if(currentGeneration!==generation)return;ready=false;mode='error';error=humanError(e);records={};emit();});
+        detachValue=function(){ref.off('value',callback);};
+      });
+    }catch(e){mode='error';error=humanError(e);emit();}
+  }
+  function ensureWrite(){
+    if(!config)return;
+    if(!user)throw new Error('سجّل الدخول أولًا لحفظ التغييرات عند الجميع.');
+    if(!editor)throw new Error('التعديل متاح لحسابَي آلاء وأحمد فقط.');
+    if(!online)throw new Error('الاتصال مقطوع. انتظر عودة الاتصال قبل التعديل.');
+    if(!ready)throw new Error('انتظر تحميل المجموعة أو تحقق من صلاحيات الحساب.');
+  }
+  function patchRecord(current,patch){
+    var row=JSON.parse(JSON.stringify(current||{}));
+    Object.keys(patch).forEach(function(path){var parts=path.split('/'),target=row;
+      for(var i=0;i<parts.length-1;i++){if(!target[parts[i]])target[parts[i]]={};target=target[parts[i]];}
+      var last=parts[parts.length-1];if(patch[path]===null)delete target[last];else target[last]=patch[path];
+    });return row;
+  }
+  async function mutate(name,patch) {
+    ensureWrite();var id=key(name);
+    if(!config){
+      var next=Object.assign({},records);next[id]=patchRecord(next[id],Object.assign({name:name},patch));
+      store(localKey,next);records=next;legacy=next;emit();return;
+    }
+    var updates={};updates[id+'/name']=name;
+    Object.keys(patch).forEach(function(field){updates[id+'/'+field]=patch[field];});
+    pending++;error='';emit();
+    try{await ref.update(updates);}catch(e){error=humanError(e);throw new Error('لم يُحفظ التغيير. '+error);}
+    finally{pending--;emit();}
+  }
+  async function write(name,field,value){
+    if(!/^(played|lend|favs\/(alaa|ahmed))$/.test(field))throw new Error('Invalid field');
+    if(records[key(name)]&&records[key(name)].deleted)throw new Error('حُذفت هذه اللعبة من المجموعة.');
+    return mutate(name,{[field]:value});
+  }
+  async function add(name,data){return mutate(name,{data:data,deleted:false});}
+  async function remove(name){return mutate(name,{deleted:true,data:null,lend:null,played:null,favs:null});}
+  function mergeLegacy(current,old){
+    if(!current)return old;
+    if(current.deleted)return current;
+    var merged=Object.assign({},current);
+    ['data','lend','played'].forEach(function(field){if(!Object.prototype.hasOwnProperty.call(current,field)&&Object.prototype.hasOwnProperty.call(old,field))merged[field]=old[field];});
+    if(old.favs)merged.favs=Object.assign({},old.favs,current.favs||{});
+    return merged;
+  }
+  async function importLegacy(){
+    ensureWrite();if(!config||importing)return;
+    importing=true;pending++;emit();
+    try {
+      var ids=Object.keys(legacy||{});
+      for(var i=0;i<ids.length;i++) {
+        var old=legacy[ids[i]];
+        await ref.child(ids[i]).transaction(function(current){return mergeLegacy(current,old);},undefined,false);
+      }
+      store(importedKey,true);
+    }catch(e){throw new Error('لم يكتمل نقل البيانات. يمكنك المحاولة مجددًا؛ البيانات القديمة ما زالت محفوظة.');}
+    finally{importing=false;pending--;emit();}
+  }
+  function login(){
+    if(!auth)return Promise.reject(new Error('المزامنة غير جاهزة'));
+    var provider=new firebase.auth.GoogleAuthProvider();provider.setCustomParameters({prompt:'select_account'});
+    return auth.signInWithPopup(provider);
+  }
+  function logout(){if(pending)return Promise.reject(new Error('انتظر انتهاء حفظ التغييرات قبل الخروج.'));return auth?auth.signOut():Promise.resolve();}
+  window.addEventListener('beforeunload',function(e){if(pending){e.preventDefault();e.returnValue='';}});
+  return {start:start,subscribe:subscribe,status:status,key:key,write:write,add:add,remove:remove,
+    login:login,logout:logout,importLegacy:importLegacy,mergeLegacy:mergeLegacy};
+})();
+
+BoardSync.start();
 
 // Mount
 var domRoot = document.getElementById('root');

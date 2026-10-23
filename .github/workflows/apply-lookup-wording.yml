@@ -1,0 +1,21 @@
+name: Apply final lookup wording
+on:
+  push:
+    branches: [feature/bgg-auto-import]
+    paths: [.github/workflows/apply-lookup-wording.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.repository == 'idalaagh/Board-games'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git apply --check wording.patch
+          git apply wording.patch
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Clarify anonymous game lookup UI"
+          git push

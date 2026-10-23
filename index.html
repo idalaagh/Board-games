@@ -60,10 +60,9 @@ function saveLS(key, val) {
 
 function weightLabel(w) {
   if (!w) return null;
-  if (w < 1.8) return { ar: 'سهل', color: '#27ae60' };
-  if (w < 2.5) return { ar: 'متوسط', color: '#f39c12' };
-  if (w < 3.5) return { ar: 'صعب', color: '#e74c3c' };
-  return { ar: 'للخبراء', color: '#8e44ad' };
+  if (w <= 2) return { ar: 'سهل', color: '#27ae60' };
+  if (w < 3.5) return { ar: 'متوسط', color: '#f39c12' };
+  return { ar: 'صعب', color: '#e74c3c' };
 }
 
 
@@ -713,13 +712,13 @@ function App() {
 
   var diffLevels = [
     {ar:'سهل',color:'#27ae60'},{ar:'متوسط',color:'#f39c12'},
-    {ar:'صعب',color:'#e74c3c'},{ar:'للخبراء',color:'#8e44ad'}
+    {ar:'صعب',color:'#e74c3c'}
   ];
   var weightLevels = [
-    {label:'١–٢ خفيف جداً',range:'1-2',color:'#2980b9'},
-    {label:'٢–٣ خفيف',range:'2-3',color:'#27ae60'},
-    {label:'٣–٤ متوسط',range:'3-4',color:'#e67e22'},
-    {label:'٤–٥ ثقيل',range:'4-5',color:'#8e44ad'},
+    {label:'١–٢',range:'1-2',color:'#888888'},
+    {label:'٢–٣',range:'2-3',color:'#888888'},
+    {label:'٣–٤',range:'3-4',color:'#888888'},
+    {label:'٤–٥',range:'4-5',color:'#888888'},
   ];
 
   function getImgUrl(name) {

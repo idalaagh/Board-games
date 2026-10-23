@@ -1,0 +1,22 @@
+diff --git a/index.html b/index.html
+index b8dbf12..8d5bb83 100644
+--- a/index.html
++++ b/index.html
+@@ -280,7 +280,7 @@ function AddModal(props) {
+     if (!id) { setBggBusy(false); return; }
+     var active = true;
+     setBggBusy(true);
+-    setBggNote('جارٍ استيراد معلومات اللعبة من BGG…');
++    setBggNote('جارٍ البحث عن بيانات اللعبة المتاحة…');
+     var timer = setTimeout(function() {
+       fetchBGGDetails(id,bggLink).then(function(data) {
+         if (!active) return;
+@@ -375,7 +375,7 @@ function AddModal(props) {
+       !form.imgEmbedded && form.imgUrl && h('img',{src:form.imgUrl,alt:'معاينة صورة اللعبة',style:{maxWidth:110,maxHeight:130,objectFit:'contain',borderRadius:6,marginTop:6}}),
+       err && h('p',{role:'alert',style:{color:'#ff9393',fontSize:13}},err)),
+     h('div',{style:S.mFoot},h('button',{type:'button',style:S.canBtn,onClick:props.onClose},'إلغاء'),
+-      h('button',{type:'submit',style:S.savBtn,disabled:busy||imageBusy||bggBusy},busy?'جارٍ الحفظ…':bggBusy?'جارٍ جلب المعلومات…':'إضافة اللعبة ✓'))));
++      h('button',{type:'submit',style:S.savBtn,disabled:busy||imageBusy||bggBusy},busy?'جارٍ الحفظ…':bggBusy?'جارٍ البحث…':'إضافة اللعبة ✓'))));
+ }
+ 
+ 
